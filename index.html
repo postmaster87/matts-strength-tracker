@@ -1,0 +1,719 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>United Movement — Matt's Strength Tracker</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=Barlow:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --navy:#1F3864; --navy-deep:#16294A; --navy-tint:#D6E0F0;
+  --gold:#C9A84C; --gold-ink:#8A6D1F; --gold-tint:#FDF3DC;
+  --teal:#2E9DAD; --teal-ink:#1E6E7A; --teal-tint:#E3F2F4;
+  --warm-tint:#E8F4D6; --warm-ink:#1A4000;
+  --bg:#F1F2F5; --card:#FFFFFF; --card-alt:#F8FAFA; --line:#DDE1E8;
+  --ink:#1A1A1A; --muted:#555555; --faint:#8A8F99;
+  --danger:#B3402F;
+  --radius:14px;
+}
+*{box-sizing:border-box; -webkit-tap-highlight-color:transparent;}
+html,body{margin:0; padding:0; background:var(--bg); color:var(--ink);
+  font-family:'Barlow',system-ui,-apple-system,sans-serif; font-size:16px;}
+body{min-height:100vh; padding-bottom:60px;}
+.cond{font-family:'Barlow Condensed','Barlow',sans-serif;}
+
+/* ---------- Lock screen ---------- */
+#lock{position:fixed; inset:0; background:var(--navy); z-index:100;
+  display:flex; flex-direction:column; align-items:center; justify-content:center; padding:24px; text-align:center;}
+#lock .brand{font-family:'Barlow Condensed'; font-weight:700; font-size:15px; letter-spacing:.22em;
+  color:var(--gold); text-transform:uppercase; margin-bottom:8px;}
+#lock h1{font-family:'Barlow Condensed'; font-weight:600; font-size:34px; margin:0 0 6px; letter-spacing:.02em; color:#fff;}
+#lock p{color:#B9C4DA; margin:0 0 28px; max-width:320px; line-height:1.45;}
+.pin-dots{display:flex; gap:14px; margin-bottom:26px; height:16px;}
+.pin-dots span{width:14px; height:14px; border-radius:50%; border:1.5px solid #5A6C92; transition:all .12s;}
+.pin-dots span.on{background:var(--gold); border-color:var(--gold);}
+.pad{display:grid; grid-template-columns:repeat(3,76px); gap:12px;}
+.pad button{height:64px; border-radius:16px; border:1px solid #33487A; background:var(--navy-deep);
+  color:#fff; font-family:'Barlow Condensed'; font-size:26px; font-weight:600; cursor:pointer;}
+.pad button:active{background:#0F1D38; transform:scale(.96);}
+.pad button.ghost{border:none; background:transparent; font-size:15px; color:#B9C4DA; font-family:'Barlow';}
+#lockMsg{height:20px; margin-top:16px; font-size:14px; color:#FFB4A6;}
+#lockMsg.ok{color:#BFE8C6;}
+
+/* ---------- Header ---------- */
+header{position:sticky; top:0; z-index:50; background:var(--navy);
+  padding:12px 14px 12px; box-shadow:0 2px 10px rgba(22,41,74,.25);}
+.topline{display:flex; align-items:baseline; justify-content:space-between; margin-bottom:10px;}
+.topline .brand{font-family:'Barlow Condensed'; font-weight:700; font-size:13px; letter-spacing:.2em;
+  color:var(--gold); text-transform:uppercase;}
+#saveState{font-size:12px; color:#8FA0C4; transition:color .2s;}
+#saveState.saving{color:var(--gold);}
+#saveState.saved{color:#BFE8C6;}
+
+.seg{display:flex; gap:6px; overflow-x:auto; scrollbar-width:none; padding-bottom:2px;}
+.seg::-webkit-scrollbar{display:none;}
+.seg button{flex:0 0 auto; padding:10px 16px; border-radius:999px; border:1px solid #3A5088;
+  background:var(--navy-deep); color:#B9C4DA; font-family:'Barlow Condensed'; font-weight:600;
+  font-size:17px; letter-spacing:.04em; cursor:pointer; white-space:nowrap;}
+.seg button.on{background:var(--gold); border-color:var(--gold); color:var(--navy-deep);}
+.seg.small{margin-top:8px;}
+.seg.small button{font-size:15px; padding:9px 14px;}
+
+/* ---------- Week scorecard chips ---------- */
+.weeks{display:grid; gap:8px; padding:12px 14px 4px;}
+.weeks.c4{grid-template-columns:repeat(4,1fr);}
+.weeks.c2{grid-template-columns:repeat(2,1fr);}
+.wk{border:1px solid var(--line); background:var(--card); border-radius:12px;
+  padding:9px 4px 7px; text-align:center; cursor:pointer; position:relative;}
+.wk .n{font-family:'Barlow Condensed'; font-weight:700; font-size:19px; letter-spacing:.03em; color:var(--muted);}
+.wk .d{font-size:11.5px; color:var(--faint); margin-top:1px;}
+.wk.on{border-color:var(--teal); background:var(--teal);}
+.wk.on .n{color:#fff;}
+.wk.on .d{color:#DFF3F6;}
+.wk .dot{position:absolute; top:6px; right:7px; width:6px; height:6px; border-radius:50%; background:var(--gold);}
+.wk.on .dot{background:#fff;}
+
+/* ---------- Session body ---------- */
+main{padding:6px 14px 30px;}
+.sessTitle{font-family:'Barlow Condensed'; font-weight:600; font-size:22px; letter-spacing:.02em;
+  margin:10px 2px 2px; color:var(--navy);}
+.sessSub{font-size:13px; color:var(--muted); margin:0 2px 6px;}
+.dateRow{display:flex; align-items:center; gap:10px; margin:8px 2px 14px;}
+.dateRow label{font-size:13px; color:var(--muted);}
+.dateRow input{width:110px;}
+
+.grp{font-family:'Barlow Condensed'; font-weight:700; font-size:14px; letter-spacing:.16em;
+  text-transform:uppercase; margin:22px 0 8px; padding:7px 12px; border-radius:8px;}
+.g-warm{background:var(--warm-tint); color:var(--warm-ink);}
+.g-str{background:var(--navy); color:#fff;}
+.g-core{background:var(--gold-tint); color:var(--gold-ink);}
+.g-acc{background:var(--teal-tint); color:var(--teal-ink);}
+.g-cool{background:var(--navy-tint); color:var(--navy);}
+
+.card{background:var(--card); border:1px solid var(--line); border-radius:var(--radius);
+  padding:12px 12px 12px; margin-bottom:10px; box-shadow:0 1px 2px rgba(22,41,74,.05);}
+.card .nm{font-weight:600; font-size:16.5px; line-height:1.25; color:var(--ink);}
+.card .meta{display:flex; gap:8px; flex-wrap:wrap; margin:5px 0 9px;}
+.tag{font-family:'Barlow Condensed'; font-weight:600; font-size:13.5px; letter-spacing:.04em;
+  padding:2px 9px; border-radius:6px; background:var(--card-alt); color:var(--muted); border:1px solid var(--line);}
+.tag.tempo{color:var(--teal-ink); background:var(--teal-tint); border-color:#C4E2E7;}
+.last{display:flex; align-items:baseline; gap:8px; margin:0 0 9px; padding:8px 10px;
+  background:var(--gold-tint); border:1px solid #EEDFB4; border-radius:9px;}
+.last .lbl{font-family:'Barlow Condensed'; font-weight:700; font-size:12px; letter-spacing:.14em; color:var(--gold-ink); flex:0 0 auto;}
+.last .val{font-size:15px; color:var(--ink); line-height:1.3; overflow-wrap:anywhere;}
+input[type=text], textarea{
+  width:100%; background:#fff; border:1px solid #C9D0DA; border-radius:10px;
+  color:var(--ink); font-family:'Barlow'; font-size:16px; padding:12px;
+  outline:none;}
+input[type=text]:focus, textarea:focus{border-color:var(--teal); box-shadow:0 0 0 2px var(--teal-tint);}
+input::placeholder, textarea::placeholder{color:var(--faint);}
+textarea{resize:vertical; min-height:64px;}
+.histToggle{margin-top:8px; background:none; border:none; color:var(--teal-ink); font-size:13px; cursor:pointer; padding:2px;}
+.hist{margin-top:6px; font-size:13.5px; color:var(--muted); line-height:1.6; display:none;}
+.hist b{color:var(--gold-ink); font-family:'Barlow Condensed'; letter-spacing:.05em; font-weight:600;}
+.hist.open{display:block;}
+
+.footcards{margin-top:26px;}
+.footcards .card .nm{color:var(--navy);}
+
+/* ---------- Gates ---------- */
+.gateCard{background:var(--card); border:1px solid var(--line); border-radius:var(--radius);
+  padding:14px; margin:14px 0; box-shadow:0 1px 2px rgba(22,41,74,.05);}
+.gateCard h3{font-family:'Barlow Condensed'; font-weight:600; font-size:20px; margin:0 0 2px; color:var(--navy);}
+.gateCard .sub{font-size:13px; color:var(--muted); margin-bottom:12px;}
+.crit{display:flex; align-items:center; gap:10px; padding:9px 0; border-top:1px solid var(--line);}
+.crit .cn{flex:1; font-size:14.5px; line-height:1.3;}
+.crit .th{font-family:'Barlow Condensed'; font-weight:600; font-size:15px; color:var(--teal-ink); flex:0 0 auto;}
+.crit input{flex:0 0 92px; padding:9px 10px; font-size:15px; text-align:center;}
+.gateMeta{margin-top:12px; display:grid; gap:8px;}
+.gateMeta label{font-size:13px; color:var(--muted); display:block; margin-bottom:3px;}
+
+.note{font-size:12.5px; color:var(--faint); text-align:center; margin:26px 12px 0; line-height:1.5;}
+
+/* ---------- Floating Done button (drops the keyboard) ---------- */
+#doneBtn{position:fixed; right:12px; bottom:12px; z-index:90; display:none;
+  padding:12px 22px; border-radius:999px; border:none; cursor:pointer;
+  background:var(--navy); color:var(--gold);
+  font-family:'Barlow Condensed'; font-weight:700; font-size:17px; letter-spacing:.12em; text-transform:uppercase;
+  box-shadow:0 4px 14px rgba(22,41,74,.35);}
+#doneBtn:active{transform:scale(.95);}
+</style>
+</head>
+<body>
+
+<!-- LOCK -->
+<div id="lock">
+  <div class="brand">The OV Standard · United Movement</div>
+  <h1 id="lockTitle">Matt&#39;s Strength Tracker</h1>
+  <p id="lockSub">Enter PIN</p>
+  <div class="pin-dots" id="pinDots"><span></span><span></span><span></span><span></span></div>
+  <div class="pad" id="pad"></div>
+  <div id="lockMsg"></div>
+</div>
+
+<!-- APP -->
+<div id="app" style="display:none">
+  <header>
+    <div class="topline">
+      <div class="brand">United Movement</div>
+      <div id="saveState">·</div>
+    </div>
+    <div class="seg" id="phaseSeg"></div>
+    <div class="seg small" id="sessSeg"></div>
+  </header>
+  <div id="weekBar"></div>
+  <main id="main"></main>
+</div>
+<button id="doneBtn" type="button">Done</button>
+
+<script>
+/* ================= PROGRAM DATA ================= */
+// ex: [name, target, tempo/cue]
+const PROGRAM = [
+ {id:"p1", name:"Phase 1", sub:"Weeks 1–4", weekLabels:["W1","W2","W3","W4"], sessions:[
+  {id:"sup", tab:"Supervised", name:"Supervised — Lower Body & Hip Stability",
+   dates:["5/19","5/26","6/2","6/11"], groups:[
+    {g:"Warmup", ex:[
+      ["90/90 Breathing","2×5 breaths","Relax"],
+      ["Hip Flexor Stretch (Active HK)","2×20s each","Hips stacked"],
+      ["Clamshell (Light Band)","2×10 each","Feel it in the glute"]]},
+    {g:"Strength", ex:[
+      ["Glute Bridge / SL Glute Bridge W3-4","3×12-15","2-1-2"],
+      ["Romanian Deadlift (RDL)","3×10-12","3-1-1"],
+      ["Box Step-Up (Low Box)","3×10 each","2-1-2"],
+      ["Lateral Band Walk","3×12 steps","Controlled"],
+      ["Cable Hip Abduction","3×12-15 each","2-1-2"]]},
+    {g:"Core & Stability", ex:[
+      ["Dead Bug","3×8 each","Slow"],
+      ["Ab Rollouts","",""],
+      ["Pallof Press (HK)","3×10-12 each","2-2-2"]]},
+    {g:"Cooldown", ex:[
+      ["Hip Flexor Stretch (Static)","2×45s each",""],
+      ["Gentle Hip CARs","2×5 each","Slow"]]}
+   ]},
+  {id:"inda", tab:"Ind. A", name:"Independent A — Upper Body",
+   dates:["5/21","5/28","6/4","6/9"], groups:[
+    {g:"Warmup", ex:[
+      ["Scapular Wall Slide","2×10","Keep against the wall"],
+      ["Band Pull-Apart","2×12","Feel it in the correct spot"],
+      ["Shoulder Pendulum","1×10 each dir.","Bodyweight"]]},
+    {g:"Strength", ex:[
+      ["Cable Row (Neutral Grip)","3×12","3-1-2"],
+      ["Lat Pulldown (Neutral Grip)","3×10-12","3-1-2"],
+      ["HK Landmine Press","3×10 each","2-0-1"]]},
+    {g:"Accessory", ex:[
+      ["Cable Shoulder ER","3×15 each","2-1-2"],
+      ["Face Pull","3×15","2-1-2"]]},
+    {g:"Cooldown", ex:[
+      ["Wrist Extension / Flexion","3×15 each",""],
+      ["Doorway Pec Stretch","2×30s each",""]]}
+   ]},
+  {id:"indb", tab:"Ind. B", name:"Independent B — Full Body / Golf Prep",
+   dates:["5/24","5/31","6/7","6/14"], groups:[
+    {g:"Warmup", ex:[
+      ["HK Thoracic Rotation","2×8 each","Paused at 0"],
+      ["90/90 Breathing","2×5 breaths","Relax"],
+      ["Bird Dog (Activation)","2×6 each","2s hold"]]},
+    {g:"Strength", ex:[
+      ["Goblet Squat","3×10-12","3-1-2"],
+      ["Suitcase Carry (DB)","3×20 yds each",""],
+      ["Rotational Band Row","3×12 each","Controlled"],
+      ["Cable Hip Abduction (Light)","2×15 each","2-1-2"]]},
+    {g:"Core & Stability", ex:[
+      ["Bird Dog (Work Sets)","3×10 each","3s hold"],
+      ["Pallof Press","3×10-12 each","2-2-2"]]},
+    {g:"Cooldown", ex:[
+      ["Hip Flexor Stretch (Static)","2×45s each",""],
+      ["HK Thoracic Rotation (Easy)","1×10 each","Slow"]]}
+   ]}
+ ]},
+ {id:"p2", name:"Phase 2", sub:"Weeks 5–8", weekLabels:["W5","W6","W7","W8"], sessions:[
+  {id:"sup", tab:"Supervised", name:"Supervised — Lower Body Strength",
+   dates:["6/16","6/23","",""], groups:[
+    {g:"Warmup", ex:[
+      ["Clamshell (Light Band)","2×12 each",""],
+      ["SL Glute Bridge (BW)","2×8 each",""],
+      ["90/90 Hip Reset","2×5 breaths",""]]},
+    {g:"Strength", ex:[
+      ["Single-Leg RDL","4×8-10 each","3-0-1"],
+      ["Trap Bar Deadlift (High Handle)","4×6-8","2-0-1"],
+      ["RFESS","3×8-10 each","3-1-2"],
+      ["Hip Abduction Cable (Unilateral)","3×12-15 each","2-1-2"],
+      ["Nordic Hamstring Curl (Assisted)","3×6-8","4-sec lower"]]},
+    {g:"Core & Stability", ex:[
+      ["Copenhagen Plank (Short Lever)","3×20-30s each",""],
+      ["Pallof Press (Standing)","3×10-12 each","2-2-2"]]},
+    {g:"Cooldown", ex:[
+      ["Hip Flexor Stretch (Static)","2×45s each",""],
+      ["Foam Roll — Thoracic","1×60-90s",""]]}
+   ]},
+  {id:"inda", tab:"Ind. A", name:"Independent A — Upper Body Strength",
+   dates:["","6/25","",""], groups:[
+    {g:"Warmup", ex:[
+      ["Scapular Wall Slide","2×10",""],
+      ["Band Pull-Apart","2×15",""],
+      ["Face Pull (Light)","2×12",""]]},
+    {g:"Strength", ex:[
+      ["DB Bench Press (Neutral)","4×8-10","3-0-1"],
+      ["Lat Pulldown (Neutral / Sup* W7-8)","3×10-12","3-1-2"],
+      ["HK DB Shoulder Press","3×10 each","2-0-1"],
+      ["Bicep Curl — Neutral (Start W6)","3×10-12","3-0-2"]]},
+    {g:"Accessory", ex:[
+      ["Cable Row (Sup* W7-8 only)","3×10-12","3-1-2"],
+      ["Rotator Cuff Circuit","2×15 each","2-0-2"]]},
+    {g:"Cooldown", ex:[
+      ["Face Pull + ER Combo","2×12","2-1-2"],
+      ["Wrist Extension / Flexion","2×15 each",""]]}
+   ]},
+  {id:"indb", tab:"Ind. B", name:"Independent B — Power & Rotation",
+   dates:["","6/28","",""], groups:[
+    {g:"Warmup", ex:[
+      ["Lateral Band Walk (Activation)","2×10 steps each",""],
+      ["Hip Hinge Practice (BW)","2×10",""],
+      ["Med Ball Hip Rotation (Light)","2×8 each",""]]},
+    {g:"Power", ex:[
+      ["Kettlebell Swing (2-Hand)","4×10","Explosive"],
+      ["Cable Woodchop (Low to High)","3×10-12 each","Explosive"],
+      ["Box Jump (Bilateral)","3×5","Max effort"],
+      ["Landmine Rotation","3×8-10 each","Controlled"]]},
+    {g:"Core & Stability", ex:[
+      ["Core Circuit (Dead Bug + Side Plank + Pallof)","2×30-45s each",""],
+      ["Med Ball Wall Throw (Rotational)","3×10 each","Explosive"]]},
+    {g:"Cooldown", ex:[
+      ["Hip Flexor Stretch (Static)","2×45s each",""],
+      ["HK Thoracic Rotation","2×8 each","Slow"]]}
+   ]},
+  {id:"indc", tab:"Ind. C", name:"Independent C (Optional) — Accessory & Prehab · Weeks 7-8",
+   dates:["",""], weekOffset:2, groups:[
+    {g:"Warmup", ex:[
+      ["Hip Band Circuit (Light)","1×12 each",""]]},
+    {g:"Prehab / Accessory", ex:[
+      ["SL Glute Bridge (Slow Tempo)","3×10 each","3-2-3"],
+      ["Shoulder ER / IR (Cable)","3×15 each","2-1-2"],
+      ["Bicep Curl — Eccentric","3×8-10","4-0-1"],
+      ["Grip Strengthener","2×15-20 each",""]]},
+    {g:"Cooldown", ex:[
+      ["Foam Roll — Hip / Glutes","1×4-6 min",""],
+      ["Hip Flexor Stretch","2×45s each",""]]}
+   ]}
+ ]},
+ {id:"p3", name:"Phase 3", sub:"Weeks 9–12", weekLabels:["W9","W10","W11","W12"], sessions:[
+  {id:"sup", tab:"Supervised", name:"Supervised — Lower Body Power",
+   dates:["","","",""], groups:[
+    {g:"Warmup", ex:[
+      ["ForceDecks SLCMJ Check (W10-12)","1×3 each leg","Max"],
+      ["Clamshell + SL Glute Bridge","2×10 each",""],
+      ["Hip Hinge Warm-Up (BW)","2×10","Controlled"]]},
+    {g:"Power", ex:[
+      ["Trap Bar Jump (Loaded)","4×5","Max velocity"],
+      ["Lateral Bound to Stick","3×5 each","Explosive"]]},
+    {g:"Strength", ex:[
+      ["RFESS (Heavy)","4×6-8 each","2-0-1"],
+      ["Single-Leg RDL (Heavy)","3×6-8 each","3-0-1"],
+      ["Hip Abduction (Peak Load)","3×10-12 each","2-1-2"],
+      ["Nordic Hamstring Curl (Full)","3×6","4-sec lower"]]},
+    {g:"Cooldown", ex:[
+      ["Hip Flexor Stretch (Static)","2×45s each",""],
+      ["90/90 Hip Reset","2×5 breaths",""]]}
+   ]},
+  {id:"inda", tab:"Ind. A", name:"Independent A — Upper Body Power",
+   dates:["","","",""], groups:[
+    {g:"Warmup", ex:[
+      ["Band Pull-Apart","2×15",""],
+      ["Scapular Wall Slide","2×10",""],
+      ["Face Pull (Light)","2×12",""]]},
+    {g:"Power", ex:[
+      ["Push Press","3×5","Explosive"],
+      ["Bench Press — Wave Loading","4 sets","~50% speed + ~80% heavy"]]},
+    {g:"Strength", ex:[
+      ["Weighted Pull-Up / Heavy Lat Pulldown","4×6-8","3-1-1"],
+      ["Single-Arm DB Row (Heavy)","3×8-10 each","3-0-1"],
+      ["Bicep Curl — Full Supination (if cleared)","3×10","3-0-2"],
+      ["Landmine Press — Rotational","3×10 each","Controlled"]]},
+    {g:"Cooldown", ex:[
+      ["Rotator Cuff + Grip Finisher","2 rounds",""],
+      ["Doorway Pec Stretch","2×30s each",""]]}
+   ]},
+  {id:"indb", tab:"Ind. B", name:"Independent B — Golf Integration",
+   dates:["","","",""], groups:[
+    {g:"Warmup", ex:[
+      ["Hip 90/90 Active Flow","2×8 each","Slow"],
+      ["Thoracic Spine Mobility Circuit","2×8-10 each","Controlled"]]},
+    {g:"Power", ex:[
+      ["Heavy Med Ball Rotational Throw","4×8 each","Max"],
+      ["Rotational Power to Decel","3×6 each","Explosive then control"]]},
+    {g:"Sport-Specific Strength", ex:[
+      ["Cable Golf Swing Sim. (Full)","3×10 each","Sport-specific"],
+      ["SL Landmine Row (Golf Posture)","3×10 each","2-0-1"]]},
+    {g:"Cooldown", ex:[
+      ["Pre-Round Hip Activation Protocol","1 circuit","Moderate"],
+      ["Hip Flexor Stretch + T-Spine Reset","2×30-45s each",""]]}
+   ]},
+  {id:"indc", tab:"Ind. C", name:"Independent C (Optional) — Accessory & Monitoring",
+   dates:["","","",""], groups:[
+    {g:"Warmup", ex:[
+      ["Phase 2 Hip Prehab Circuit (Light)","1×10-12 each",""]]},
+    {g:"Monitoring + Accessory", ex:[
+      ["ForceFrame Hip Abduction Check (W11-12)","1×3 each","Max"],
+      ["Golf Address ISO Hip Hinge Hold","3×30s",""],
+      ["KB Suitcase Carry","3×30 yds each",""],
+      ["Eccentric Supination Curl (R Arm)","3×10","4s lower"]]},
+    {g:"Cooldown", ex:[
+      ["Soft Tissue Work — Right Hip + Arm","1×8-10 min",""],
+      ["90/90 Hip Reset","2×5 breaths",""]]}
+   ]}
+ ]}
+];
+
+const GATES = [
+ {id:"g5", title:"Phase Gate — Week 5 VALD Assessment", sub:"All criteria must be met to begin Phase 2", crits:[
+   ["SLCMJ LSI — ForceDecks","≥70%"],["Hip Abduction LSI — DynaMo","≥75%"],["Hip Abduction LSI — ForceFrame","≥75%"],
+   ["Hip ER LSI — DynaMo","≥70%"],["Hip ER LSI — ForceFrame 90/90","≥70%"],["Shoulder ER LSI — ForceFrame 90/90","≥75%"],
+   ["Elbow Flexion Deficit — DynaMo","<25%"],["IMTP Asymmetry — ForceDecks","<15%"],["Right Hip NPRS (avg last 2 wks)","≤3/10"]],
+  meta:["Assessment date","O'Rien's notes / decision","Phase 2 start date (if cleared)"]},
+ {id:"g9", title:"Phase Gate — Week 9 VALD Assessment", sub:"All criteria must be met to begin Phase 3 · also serves as pre-surgical data package", crits:[
+   ["SLCMJ LSI — ForceDecks","≥85%"],["Hip Abduction LSI — DynaMo","≥85%"],["Hip Abduction LSI — ForceFrame","≥85%"],
+   ["Hip ER LSI — DynaMo","≥80%"],["Hip ER LSI — ForceFrame 90/90","≥80%"],["Shoulder ER LSI — ForceFrame 90/90","≥85%"],
+   ["Elbow Flexion Deficit — DynaMo","<20%"],["Hip Adduction LSI — DynaMo","≥75%"],["IMTP Asymmetry — ForceDecks","<10%"],
+   ["Right Hip NPRS (avg last 2 wks)","≤2/10"]],
+  meta:["Assessment date","O'Rien's notes / decision","Phase 3 start date (if cleared)"]},
+ {id:"rtg", title:"Return to Golf Checklist", sub:"All criteria required · physician clearance also required", crits:[
+   ["SLCMJ LSI — ForceDecks","≥90%"],["Hip Abduction LSI — DynaMo","≥90%"],["Hip Abduction LSI — ForceFrame Standing","≥90%"],
+   ["Hip ER LSI — DynaMo","≥85%"],["Hip ER LSI — ForceFrame 90/90","≥85%"],["Shoulder ER LSI — ForceFrame 90/90","≥90%"],
+   ["Elbow Flexion Deficit — DynaMo","<10%"],["IMTP Asymmetry — ForceDecks","<10%"],["Right Hip NPRS — Swing Simulation","≤1/10"],
+   ["SL Step-Down — Golf Setup Posture","Pass"],["Bilateral Rotational Force Symmetry","≥85%"],["Physician / Surgeon Clearance","Documented"]],
+  meta:["RTG clearance date","O'Rien's signature","Surgeon's clearance date","Notes"]}
+];
+
+/* Seed = history migrated from the spreadsheet. key: e.p.sess.groupIdx.exIdx.weekIdx */
+const SEED = {
+ // P1 Supervised strength/core
+ "e.p1.sup.1.0.0":"Intent","e.p1.sup.1.0.1":"Start w/ the glutes","e.p1.sup.1.0.2":"BW, 20","e.p1.sup.1.0.3":"BW",
+ "e.p1.sup.1.1.0":"95, 105, 115","e.p1.sup.1.1.1":"115, 125, 135","e.p1.sup.1.1.2":"115, 135, 155","e.p1.sup.1.1.3":"135, 150, 160",
+ "e.p1.sup.1.2.0":"Hit center of the box","e.p1.sup.1.2.1":"Squeeze glutes","e.p1.sup.1.2.2":"BW, 20, 20","e.p1.sup.1.2.3":"Bench. 25 DBs",
+ "e.p1.sup.1.3.0":"Rhythm","e.p1.sup.1.3.1":"Stay stacked","e.p1.sup.1.3.2":"BW, 10, 10","e.p1.sup.1.3.3":"Heavy band, no weight, 15 reps each side. Good rhythm",
+ "e.p1.sup.1.4.0":"Keep the leg straight","e.p1.sup.1.4.1":"Blue","e.p1.sup.1.4.2":"Red band","e.p1.sup.1.4.3":"7.5 lbs cable stack",
+ "e.p1.sup.2.0.0":"30-30-30","e.p1.sup.2.0.1":"Bird dogs","e.p1.sup.2.0.2":"Around the worlds",
+ "e.p1.sup.2.1.0":"Superman","e.p1.sup.2.1.1":"Physio passes","e.p1.sup.2.1.2":"High plank hip rot.",
+ "e.p1.sup.2.2.1":"30 sec hold — Black",
+ "s.p1.sup.0":"Independent workout day. Skipped the core since we hit it on Tuesday. Was not sore on Friday.",
+ // P1 Independent A
+ "e.p1.inda.1.0.0":"55","e.p1.inda.1.0.1":"57.5, 60, 65","e.p1.inda.1.0.2":"65, 70, 72.5","e.p1.inda.1.0.3":"OV workout day",
+ "e.p1.inda.1.1.0":"55","e.p1.inda.1.1.1":"57.5, 60, 65","e.p1.inda.1.1.2":"65, 70, 72.5",
+ "e.p1.inda.1.2.0":"25, 25, 30","e.p1.inda.1.2.1":"25, 27.5, 27.5","e.p1.inda.1.2.2":"27.5, 30, 32.5",
+ "e.p1.inda.2.0.0":"7.5, 12","e.p1.inda.2.0.1":"7.5, 11","e.p1.inda.2.0.2":"7.5, 11",
+ "e.p1.inda.2.1.0":"24, 19, 19","e.p1.inda.2.1.1":"22.5, 22.5, 22.5","e.p1.inda.2.1.2":"22.5, 24, 24",
+ "e.p1.inda.3.1.0":"Single side","e.p1.inda.3.1.1":"Single side","e.p1.inda.3.1.2":"Single side",
+ "n.p1.inda.0":"1 → 0","n.p1.inda.1":"0 → 0","n.p1.inda.2":"0 → 0",
+ // P1 Independent B
+ "e.p1.indb.0.2.0":"Water on the back",
+ "e.p1.indb.1.0.0":"40","e.p1.indb.1.0.1":"45, 50, 55","e.p1.indb.1.0.2":"55, 60, 65","e.p1.indb.1.0.3":"60, 65, 70",
+ "e.p1.indb.1.1.0":"35","e.p1.indb.1.1.1":"40","e.p1.indb.1.1.2":"40","e.p1.indb.1.1.3":"Farmer carries 45",
+ "e.p1.indb.1.2.0":"Tension throughout","e.p1.indb.1.2.1":"Red","e.p1.indb.1.2.2":"Red","e.p1.indb.1.2.3":"Red. Square hips",
+ "e.p1.indb.1.3.0":"Blue TheraBand","e.p1.indb.1.3.1":"Blue TheraBand","e.p1.indb.1.3.2":"Blue TheraBand","e.p1.indb.1.3.3":"7.5 lbs cable stack",
+ "e.p1.indb.2.0.0":"Intent","e.p1.indb.2.0.1":"Feels correct","e.p1.indb.2.0.2":"Remember to hold","e.p1.indb.2.0.3":"Stack the hips",
+ "e.p1.indb.2.1.0":"Controlled rotation","e.p1.indb.2.1.1":"22.5","e.p1.indb.2.1.2":"24","e.p1.indb.2.1.3":"25.5",
+ "e.p1.indb.3.0.2":"What is this stretch?",
+ "n.p1.indb.1":"0-0-1",
+ "s.p1.indb.0":"Arm PT: 17.5, 17.5, 20. Forearms: 2×15 — 20, 12.5/15, 15/20, 7.5",
+ // P2 Independent A (week index 1 = W6)
+ "e.p2.inda.0.0.0":"Rest",
+ "e.p2.inda.0.1.1":"Red","e.p2.inda.0.2.1":"14",
+ "e.p2.inda.1.0.1":"35, 40, 40","e.p2.inda.1.1.1":"65, 70, 72.5","e.p2.inda.1.2.1":"20, 20, 20","e.p2.inda.1.3.1":"20, 20, 20",
+ "e.p2.inda.2.0.1":"65, 67.5, 70 — narrow","e.p2.inda.2.1.1":"7.5, 10",
+ "n.p2.inda.1":"0 → 0",
+ "s.p2.inda.1":"Focused on squeezing the lats/back on the pulls and reminding myself big chest."
+};
+
+/* ================= STATE / STORAGE ================= */
+const STORE_KEY = "ovs-matt-tracker-v1";
+/* Dual-mode persistence:
+   - Published Claude artifact -> window.storage (cloud, shared with OV)
+   - Netlify / any other host  -> localStorage (saved on this device only) */
+const CLOUD = typeof window.storage !== "undefined" && window.storage && typeof window.storage.get === "function";
+const store = {
+  async get(k){
+    if(CLOUD){ return await window.storage.get(k, true); }
+    const v = localStorage.getItem(k);
+    return v ? {key:k, value:v} : null;
+  },
+  async set(k,v){
+    if(CLOUD){ return await window.storage.set(k, v, true); }
+    localStorage.setItem(k, v);
+    return {key:k, value:v};
+  }
+};
+let DATA = null;          // {pin, vals:{...}, dates:{...}}
+let ui = {phase:0, sess:0, week:{}, tab:"program"}; // week keyed by phase.sess
+let saveTimer=null;
+
+async function loadData(){
+  try{ const r = await store.get(STORE_KEY);
+    if(r && r.value){ DATA = JSON.parse(r.value); return true; } }catch(e){}
+  return false;
+}
+function scheduleSave(){
+  const el=document.getElementById("saveState");
+  el.textContent="Saving…"; el.className="saving";
+  clearTimeout(saveTimer);
+  saveTimer=setTimeout(async ()=>{
+    try{ await store.set(STORE_KEY, JSON.stringify(DATA));
+      el.textContent=CLOUD?"Saved":"Saved (this device)"; el.className="saved";
+      setTimeout(()=>{el.textContent="·";el.className="";},1500);
+    }catch(e){ el.textContent="Save failed — check connection"; el.className="saving"; }
+  },700);
+}
+function val(k){ return (DATA.vals && DATA.vals[k]) || ""; }
+function setVal(k,v){ DATA.vals[k]=v; scheduleSave(); }
+function getDate(p,s,w){ const k=`d.${p}.${s}.${w}`;
+  if(DATA.vals[k]!==undefined) return DATA.vals[k];
+  const ph=PROGRAM.find(x=>x.id===p); const se=ph.sessions.find(x=>x.id===s);
+  return se.dates[w]||""; }
+
+/* ================= LOCK ================= */
+let pinBuf="", pinMode="enter"; // enter | create | confirm
+let pinFirst="";
+function drawPad(){
+  const pad=document.getElementById("pad"); pad.innerHTML="";
+  ["1","2","3","4","5","6","7","8","9","clear","0","del"].forEach(k=>{
+    const b=document.createElement("button");
+    if(k==="clear"){b.textContent="Clear";b.className="ghost";}
+    else if(k==="del"){b.textContent="⌫";b.className="ghost";b.style.fontSize="22px";}
+    else b.textContent=k;
+    b.onclick=()=>keyPress(k); pad.appendChild(b);
+  });
+}
+function drawDots(){ const d=document.getElementById("pinDots").children;
+  for(let i=0;i<4;i++) d[i].className = i<pinBuf.length?"on":""; }
+function keyPress(k){
+  const msg=document.getElementById("lockMsg");
+  if(k==="clear"){pinBuf="";drawDots();return;}
+  if(k==="del"){pinBuf=pinBuf.slice(0,-1);drawDots();return;}
+  if(pinBuf.length>=4) return;
+  pinBuf+=k; drawDots();
+  if(pinBuf.length===4){
+    if(pinMode==="enter"){
+      if(pinBuf===DATA.pin){ unlock(); }
+      else{ msg.textContent="Wrong PIN"; msg.className=""; pinBuf=""; setTimeout(drawDots,250); }
+    } else if(pinMode==="create"){
+      pinFirst=pinBuf; pinBuf=""; pinMode="confirm";
+      document.getElementById("lockSub").textContent="Re-enter the same PIN to confirm";
+      msg.textContent=""; setTimeout(drawDots,150);
+    } else { // confirm
+      if(pinBuf===pinFirst){
+        DATA={pin:pinBuf, vals:Object.assign({},SEED)};
+        try{ store.set(STORE_KEY, JSON.stringify(DATA)).catch(()=>{}); }catch(e){}
+        msg.textContent="PIN set"; msg.className="ok";
+        setTimeout(unlock,350);
+      } else {
+        msg.textContent="Didn't match — start over"; msg.className="";
+        pinBuf=""; pinFirst=""; pinMode="create";
+        document.getElementById("lockSub").textContent="Create a 4-digit PIN";
+        setTimeout(drawDots,250);
+      }
+    }
+  }
+}
+function unlock(){
+  document.getElementById("lock").style.display="none";
+  document.getElementById("app").style.display="block";
+  // default week: first week without an entry-heavy date? -> first blank date, else last
+  render();
+}
+
+/* ================= RENDER ================= */
+function esc(s){return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/"/g,"&quot;");}
+
+function grpClass(name){
+  const n=name.toLowerCase();
+  if(n.includes("warmup")) return "g-warm";
+  if(n.includes("strength")||n.includes("power")) return "g-str";
+  if(n.includes("core")) return "g-core";
+  if(n.includes("accessory")||n.includes("prehab")||n.includes("monitoring")) return "g-acc";
+  return "g-cool";
+}
+
+/* Auto-insert the slash while typing a m/d date */
+function fmtDate(el){
+  let v=el.value;
+  if(v.includes("/")){ // user typed their own slash — just tidy it
+    const parts=v.replace(/[^\d/]/g,"").split("/");
+    el.value=parts[0].slice(0,2)+"/"+parts.slice(1).join("").slice(0,2);
+    return;
+  }
+  const d=v.replace(/\D/g,"").slice(0,4);
+  if(d.length>=2){
+    if(d[0]>"1") el.value=d[0]+"/"+d.slice(1,3);       // 5 -> 5/19
+    else el.value=d.slice(0,2)+"/"+d.slice(2,4);       // 12 -> 12/01
+  } else el.value=d;
+}
+
+function render(){
+  const phSeg=document.getElementById("phaseSeg");
+  phSeg.innerHTML="";
+  PROGRAM.forEach((p,i)=>{
+    const b=document.createElement("button");
+    b.textContent=p.name+" · "+p.sub;
+    b.className="cond"+(ui.tab==="program"&&ui.phase===i?" on":"");
+    b.onclick=()=>{ui.tab="program";ui.phase=i;ui.sess=0;render();};
+    phSeg.appendChild(b);
+  });
+  const gb=document.createElement("button");
+  gb.textContent="Gate Check-Ins";
+  gb.className="cond"+(ui.tab==="gates"?" on":"");
+  gb.onclick=()=>{ui.tab="gates";render();};
+  phSeg.appendChild(gb);
+
+  const sessSeg=document.getElementById("sessSeg");
+  const weekBar=document.getElementById("weekBar");
+  const main=document.getElementById("main");
+
+  if(ui.tab==="gates"){ sessSeg.innerHTML=""; weekBar.innerHTML=""; renderGates(main); return; }
+
+  const ph=PROGRAM[ui.phase];
+  sessSeg.innerHTML="";
+  ph.sessions.forEach((s,i)=>{
+    const b=document.createElement("button");
+    b.textContent=s.tab; b.className="cond"+(ui.sess===i?" on":"");
+    b.onclick=()=>{ui.sess=i;render();};
+    sessSeg.appendChild(b);
+  });
+
+  const sess=ph.sessions[ui.sess];
+  const nWeeks=sess.dates.length;
+  const off=sess.weekOffset||0;
+  const wkKey=ph.id+"."+sess.id;
+  if(ui.week[wkKey]===undefined){
+    let def=nWeeks-1;
+    for(let w=0;w<nWeeks;w++){ if(!getDate(ph.id,sess.id,w)){def=w;break;} }
+    ui.week[wkKey]=def;
+  }
+  const cw=ui.week[wkKey];
+
+  // week chips
+  weekBar.innerHTML="";
+  const wrap=document.createElement("div");
+  wrap.className="weeks "+(nWeeks===2?"c2":"c4");
+  for(let w=0;w<nWeeks;w++){
+    const chip=document.createElement("div");
+    chip.className="wk"+(w===cw?" on":"");
+    const hasData=Object.keys(DATA.vals).some(k=>k.startsWith(`e.${ph.id}.${sess.id}.`)&&k.endsWith("."+w)&&DATA.vals[k]);
+    chip.innerHTML=`<div class="n cond">${ph.weekLabels[w+off]}</div><div class="d">${esc(getDate(ph.id,sess.id,w)||"— —")}</div>`+(hasData?'<div class="dot"></div>':'');
+    chip.onclick=()=>{ui.week[wkKey]=w;render();};
+    wrap.appendChild(chip);
+  }
+  weekBar.appendChild(wrap);
+
+  // session body
+  let h=`<div class="sessTitle cond">${esc(sess.name)}</div>`;
+  h+=`<div class="dateRow"><label>${ph.weekLabels[cw+off]} date</label>
+      <input type="text" inputmode="numeric" placeholder="mm/dd" value="${esc(getDate(ph.id,sess.id,cw))}"
+        oninput="fmtDate(this)" onchange="setVal('d.${ph.id}.${sess.id}.${cw}',this.value)"></div>`;
+
+  sess.groups.forEach((g,gi)=>{
+    h+=`<div class="grp ${grpClass(g.g)}">${esc(g.g)}</div>`;
+    g.ex.forEach((ex,ei)=>{
+      const base=`e.${ph.id}.${sess.id}.${gi}.${ei}.`;
+      const k=base+cw;
+      // last non-empty entry before current week
+      let last=null;
+      for(let w=cw-1;w>=0;w--){ if(val(base+w)){last={w,v:val(base+w)};break;} }
+      // full history
+      let hist="";
+      for(let w=0;w<nWeeks;w++){ if(w!==cw&&val(base+w)) hist+=`<div><b>${ph.weekLabels[w+off]}</b> · ${esc(val(base+w))}</div>`; }
+      h+=`<div class="card">
+        <div class="nm">${esc(ex[0])}</div>
+        <div class="meta">${ex[1]?`<span class="tag">${esc(ex[1])}</span>`:""}${ex[2]?`<span class="tag tempo">${esc(ex[2])}</span>`:""}</div>
+        ${last?`<div class="last"><span class="lbl">LAST · ${ph.weekLabels[last.w+off]}</span><span class="val">${esc(last.v)}</span></div>`:""}
+        <input type="text" enterkeyhint="done" placeholder="weight × reps, band, notes…" value="${esc(val(k))}"
+          onchange="setVal('${k}',this.value)">
+        ${hist?`<button class="histToggle" onclick="this.nextElementSibling.classList.toggle('open');this.textContent=this.nextElementSibling.classList.contains('open')?'Hide all weeks':'All weeks'">All weeks</button><div class="hist">${hist}</div>`:""}
+      </div>`;
+    });
+  });
+
+  h+=`<div class="footcards">
+    <div class="card"><div class="nm">Right Hip NPRS (before → after)</div>
+      <input type="text" inputmode="decimal" placeholder="e.g. 2 → 1" value="${esc(val(`n.${ph.id}.${sess.id}.${cw}`))}"
+        onchange="setVal('n.${ph.id}.${sess.id}.${cw}',this.value)"></div>
+    <div class="card"><div class="nm">Session notes</div>
+      <textarea placeholder="How did it go?" onchange="setVal('s.${ph.id}.${sess.id}.${cw}',this.value)">${esc(val(`s.${ph.id}.${sess.id}.${cw}`))}</textarea></div>
+  </div>
+  <div class="note">The OV Standard LLC · United Movement · autosaves as you type</div>`;
+  main.innerHTML=h;
+  window.scrollTo(0,0);
+}
+
+function renderGates(main){
+  let h=`<div class="sessTitle cond" style="margin-top:14px">Phase Gate Check-Ins & RTG Checklist</div>
+  <div class="sessSub">VALD criteria · fill in scores / status as they're tested</div>`;
+  GATES.forEach(g=>{
+    h+=`<div class="gateCard"><h3 class="cond">${esc(g.title)}</h3><div class="sub">${esc(g.sub)}</div>`;
+    g.crits.forEach((c,i)=>{
+      const k=`g.${g.id}.${i}`;
+      h+=`<div class="crit"><div class="cn">${esc(c[0])}</div><div class="th cond">${esc(c[1])}</div>
+        <input type="text" placeholder="—" value="${esc(val(k))}" onchange="setVal('${k}',this.value)"></div>`;
+    });
+    h+=`<div class="gateMeta">`;
+    g.meta.forEach((m,i)=>{
+      const k=`gm.${g.id}.${i}`;
+      h+=`<div><label>${esc(m)}</label><input type="text" value="${esc(val(k))}" onchange="setVal('${k}',this.value)"></div>`;
+    });
+    h+=`</div></div>`;
+  });
+  main.innerHTML=h;
+  window.scrollTo(0,0);
+}
+
+/* ================= DONE BUTTON (keyboard dismiss) ================= */
+(function(){
+  const btn=document.getElementById("doneBtn");
+  if(!btn) return;
+  function isField(el){ return el && (el.tagName==="INPUT"||el.tagName==="TEXTAREA"); }
+  // Keep the button floating just above the on-screen keyboard
+  function place(){
+    const vv=window.visualViewport;
+    if(vv){
+      const lift=window.innerHeight - vv.height - vv.offsetTop;
+      btn.style.transform="translateY(-"+Math.max(0,lift)+"px)";
+    }
+  }
+  if(window.visualViewport){
+    window.visualViewport.addEventListener("resize",place);
+    window.visualViewport.addEventListener("scroll",place);
+  }
+  document.addEventListener("focusin",e=>{
+    if(isField(e.target)){ btn.style.display="block"; place(); }
+  });
+  document.addEventListener("focusout",()=>{
+    // small delay so a Done tap isn't cancelled by the hide
+    setTimeout(()=>{ if(!isField(document.activeElement)) btn.style.display="none"; },120);
+  });
+  // pointerdown + preventDefault: fires before the input loses focus,
+  // so one tap reliably commits the entry and drops the keyboard
+  btn.addEventListener("pointerdown",e=>{
+    e.preventDefault();
+    const a=document.activeElement;
+    if(isField(a)){ a.blur(); }   // blur fires the field's onchange -> autosave
+    btn.style.display="none";
+    btn.style.transform="";
+  });
+})();
+
+/* ================= INIT ================= */
+(async function(){
+  drawPad();
+  const found = await loadData();
+  if(!found || !DATA || !DATA.pin){
+    pinMode="create";
+    document.getElementById("lockSub").textContent="First time here — create a 4-digit PIN. You and OV will both use this PIN to open the tracker.";
+    if(!DATA) DATA=null;
+  } else {
+    pinMode="enter";
+    document.getElementById("lockSub").textContent="Enter PIN";
+  }
+})();
+</script>
+</body>
+</html>
