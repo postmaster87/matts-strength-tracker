@@ -6,6 +6,9 @@
 <title>United Movement — Matt's Strength Tracker</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=Barlow:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
 <style>
 :root{
   --navy:#1F3864; --navy-deep:#16294A; --navy-tint:#D6E0F0;
@@ -48,6 +51,9 @@ header{position:sticky; top:0; z-index:50; background:var(--navy);
 .topline .brand{font-family:'Barlow Condensed'; font-weight:700; font-size:13px; letter-spacing:.2em;
   color:var(--gold); text-transform:uppercase;}
 #saveState{font-size:12px; color:#8FA0C4; transition:color .2s;}
+#syncBtn{padding:4px 12px; border-radius:999px; border:1px solid var(--gold); background:transparent;
+  color:var(--gold); font-family:'Barlow Condensed'; font-weight:600; font-size:13px; letter-spacing:.06em; cursor:pointer;}
+#syncBtn.on{background:var(--gold); color:var(--navy-deep);}
 #saveState.saving{color:var(--gold);}
 #saveState.saved{color:#BFE8C6;}
 
@@ -157,7 +163,10 @@ textarea{resize:vertical; min-height:64px;}
   <header>
     <div class="topline">
       <div class="brand">United Movement</div>
-      <div id="saveState">·</div>
+      <div style="display:flex; align-items:center; gap:10px;">
+        <button id="syncBtn" type="button" style="display:none"></button>
+        <div id="saveState">·</div>
+      </div>
     </div>
     <div class="seg" id="phaseSeg"></div>
     <div class="seg small" id="sessSeg"></div>
@@ -318,7 +327,7 @@ const PROGRAM = [
       ["90/90 Hip Reset","2×5 breaths",""]]}
    ]},
   {id:"inda", tab:"Ind. A", name:"Independent A — Upper Body Power",
-   dates:["","","",""], groups:[
+   dates:["7/17","","",""], groups:[
     {g:"Warmup", ex:[
       ["Band Pull-Apart","2×15",""],
       ["Scapular Wall Slide","2×10",""],
@@ -330,9 +339,9 @@ const PROGRAM = [
       ["Weighted Pull-Up / Heavy Lat Pulldown","4×6-8","3-1-1"],
       ["Single-Arm DB Row (Heavy)","3×8-10 each","3-0-1"],
       ["Bicep Curl — Full Supination (if cleared)","3×10","3-0-2"],
-      ["Landmine Press — Rotational","3×10 each","Controlled"]]},
+      ["Landmine Row","3×10 each","Controlled"]]},
     {g:"Cooldown", ex:[
-      ["Rotator Cuff + Grip Finisher","2 rounds",""],
+      ["Dead Hangs","4×30s",""],
       ["Doorway Pec Stretch","2×30s each",""]]}
    ]},
   {id:"indb", tab:"Ind. B", name:"Independent B — Golf Integration",
@@ -341,7 +350,8 @@ const PROGRAM = [
       ["Hip 90/90 Active Flow","2×8 each","Slow"],
       ["Thoracic Spine Mobility Circuit","2×8-10 each","Controlled"]]},
     {g:"Power", ex:[
-      ["Heavy Med Ball Rotational Throw","4×8 each","Max"],
+      ["Rotational Box Jump","8-10 each","Explosive"],
+      ["Landmine Oblique Twist (Kneeling)","8-10","Controlled"],
       ["Rotational Power to Decel","3×6 each","Explosive then control"]]},
     {g:"Sport-Specific Strength", ex:[
       ["Cable Golf Swing Sim. (Full)","3×10 each","Sport-specific"],
@@ -423,7 +433,15 @@ const SEED = {
  "e.p2.inda.1.0.1":"35, 40, 40","e.p2.inda.1.1.1":"65, 70, 72.5","e.p2.inda.1.2.1":"20, 20, 20","e.p2.inda.1.3.1":"20, 20, 20",
  "e.p2.inda.2.0.1":"65, 67.5, 70 — narrow","e.p2.inda.2.1.1":"7.5, 10",
  "n.p2.inda.1":"0 → 0",
- "s.p2.inda.1":"Focused on squeezing the lats/back on the pulls and reminding myself big chest."
+ "s.p2.inda.1":"Focused on squeezing the lats/back on the pulls and reminding myself big chest.",
+ // P3 Independent A — Week 9 (7/17)
+ "e.p3.inda.0.0.0":"Red","e.p3.inda.0.1.0":"Red","e.p3.inda.0.2.0":"12.5",
+ "e.p3.inda.1.0.0":"105, 95, 95","e.p3.inda.1.1.0":"135, 140, 145",
+ "e.p3.inda.2.0.0":"120","e.p3.inda.2.1.0":"65","e.p3.inda.2.2.0":"20, 20, 22.5","e.p3.inda.2.3.0":"N/A",
+ "e.p3.inda.3.0.0":"N/A",
+ // P3 Independent B — Week 9
+ "e.p3.indb.1.0.0":"8","e.p3.indb.1.1.0":"15","e.p3.indb.1.2.0":"22.5, 24, 24",
+ "e.p3.indb.2.0.0":"22.5, 20.5, 20.5","e.p3.indb.2.1.0":"25, 30, 35"
 };
 
 /* ================= STATE / STORAGE ================= */
@@ -450,7 +468,16 @@ let saveTimer=null;
 
 async function loadData(){
   try{ const r = await store.get(STORE_KEY);
-    if(r && r.value){ DATA = JSON.parse(r.value); return true; } }catch(e){}
+    if(r && r.value){
+      DATA = JSON.parse(r.value);
+      // Migration: when the program file is updated with newly seeded history
+      // (e.g. OV's Phase 3 revision), fill in any SEED keys this device doesn't
+      // have yet. Never overwrites anything the user has entered.
+      let added=false;
+      for(const k in SEED){ if(DATA.vals[k]===undefined){ DATA.vals[k]=SEED[k]; added=true; } }
+      if(added){ try{ store.set(STORE_KEY, JSON.stringify(DATA)).catch(()=>{}); }catch(e){} }
+      return true;
+    } }catch(e){}
   return false;
 }
 function scheduleSave(){
@@ -459,7 +486,8 @@ function scheduleSave(){
   clearTimeout(saveTimer);
   saveTimer=setTimeout(async ()=>{
     try{ await store.set(STORE_KEY, JSON.stringify(DATA));
-      el.textContent=CLOUD?"Saved":"Saved (this device)"; el.className="saved";
+      pushCloud();
+      el.textContent=CLOUD?"Saved":(fbUser?"Saved + synced":"Saved (this device)"); el.className="saved";
       setTimeout(()=>{el.textContent="·";el.className="";},1500);
     }catch(e){ el.textContent="Save failed — check connection"; el.className="saving"; }
   },700);
@@ -701,9 +729,79 @@ function renderGates(main){
   });
 })();
 
+/* ================= FIREBASE CLOUD SYNC =================
+   Fill these in from Firebase console -> Project settings -> your web app.
+   Until every PASTE_ placeholder is replaced, sync stays off and the app
+   runs local-only. The PIN remains a per-device lock; Google sign-in is
+   the real security for the shared cloud log. */
+const firebaseConfig = {
+  apiKey: "PASTE_API_KEY",
+  authDomain: "PASTE_PROJECT_ID.firebaseapp.com",
+  projectId: "PASTE_PROJECT_ID",
+  storageBucket: "PASTE_PROJECT_ID.appspot.com",
+  messagingSenderId: "PASTE_SENDER_ID",
+  appId: "PASTE_APP_ID"
+};
+const SHARED_DOC = ["trackers","matt-strength"]; // one shared log: Matt + OV
+
+let fbUser=null, fbDoc=null, fbUnsub=null;
+const FB_READY = typeof firebase!=="undefined" && !CLOUD && firebaseConfig.apiKey && !firebaseConfig.apiKey.startsWith("PASTE_");
+
+function syncUI(){
+  const b=document.getElementById("syncBtn");
+  if(!b) return;
+  if(!FB_READY){ b.style.display="none"; return; }
+  b.style.display="inline-block";
+  if(fbUser){ b.className="on"; b.textContent="Sync: "+(fbUser.displayName||"on").split(" ")[0]; }
+  else{ b.className=""; b.textContent="Sync off — sign in"; }
+}
+function initFirebase(){
+  if(!FB_READY) return;
+  firebase.initializeApp(firebaseConfig);
+  fbDoc = firebase.firestore().collection(SHARED_DOC[0]).doc(SHARED_DOC[1]);
+  firebase.auth().onAuthStateChanged(u=>{
+    fbUser=u; syncUI();
+    if(fbUnsub){ fbUnsub(); fbUnsub=null; }
+    if(u && DATA){
+      pushCloud(); // upload this device's log first (merge, never wipes)
+      fbUnsub = fbDoc.onSnapshot(snap=>{
+        const d=snap.data();
+        if(d && d.vals) applyRemote(d.vals);
+      }, err=>{ console.warn("sync read blocked:", err.message);
+        const el=document.getElementById("saveState");
+        el.textContent="Sync blocked — check Firestore rules / allowed emails"; el.className="saving"; });
+    }
+  });
+  const b=document.getElementById("syncBtn");
+  b.onclick=()=>{
+    if(fbUser){ if(confirm("Sign out of cloud sync? Data stays saved on this device.")) firebase.auth().signOut(); }
+    else firebase.auth().signInWithPopup(new firebase.auth.GoogleAuthProvider()).catch(e=>alert("Sign-in failed: "+e.message));
+  };
+  syncUI();
+}
+function pushCloud(){
+  if(!fbUser || !fbDoc || !DATA) return;
+  fbDoc.set({vals: DATA.vals, updated: Date.now(), by: fbUser.email||""}, {merge:true})
+    .catch(e=>console.warn("sync write blocked:", e.message));
+}
+function applyRemote(remoteVals){
+  if(!DATA) return;
+  let changed=false;
+  for(const k in remoteVals){
+    if(DATA.vals[k]!==remoteVals[k]){ DATA.vals[k]=remoteVals[k]; changed=true; }
+  }
+  if(changed){
+    try{ store.set(STORE_KEY, JSON.stringify(DATA)).catch(()=>{}); }catch(e){}
+    const a=document.activeElement;
+    const typing=a && (a.tagName==="INPUT"||a.tagName==="TEXTAREA");
+    if(!typing && document.getElementById("app").style.display!=="none") render();
+  }
+}
+
 /* ================= INIT ================= */
 (async function(){
   drawPad();
+  initFirebase();
   const found = await loadData();
   if(!found || !DATA || !DATA.pin){
     pinMode="create";
