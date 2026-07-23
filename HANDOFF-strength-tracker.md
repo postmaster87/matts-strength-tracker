@@ -41,17 +41,17 @@ Single-file web app (`index.html`, no build step) tracking a 12-week strength pr
 
 ### Remaining — GitHub Pages
 
-- [ ] Confirm the tracker file is committed as `index.html` in repo root
-- [ ] Settings → Pages → Deploy from branch → `main` / root → Save
-- [ ] Live URL loads at `https://<username>.github.io/<repo>/` and PIN screen works
+- [x] Confirm the tracker file is committed as `index.html` in repo root
+- [x] Settings → Pages → Deploy from branch → `main` / root → Save
+- [x] Live URL loads at `https://postmaster87.github.io/matts-strength-tracker/` and PIN screen works
 - [ ] On phone: open live URL in Chrome → Add to Home screen (ALWAYS launch from this icon — a downloaded copy of the file gets a separate localStorage and loses data)
 
 ### Remaining — Firebase project
 
-- [ ] console.firebase.google.com → Add project (e.g. `matt-strength-tracker`) → disable Analytics
+- [x] console.firebase.google.com → Add project (e.g. `matt-strength-tracker`) → disable Analytics
   - Must be a **separate project** from the FlowCode range tracker (different security model)
-- [ ] Project → `</>` web icon → register app → copy the `firebaseConfig` values
-- [ ] Paste each value over the `PASTE_...` placeholders in the marked block near the bottom of `index.html`'s script → commit + push
+- [x] Project → `</>` web icon → register app → copy the `firebaseConfig` values *(saved to `fireBaseConfig.txt`, project `matts-strength-tracker`)*
+- [x] Paste each value over the `PASTE_...` placeholders in the marked block near the bottom of `index.html`'s script → commit + push *(done by Claude Code 2026-07-23)*
 - [ ] Build → Authentication → Get started → Sign-in method → **Google** → Enable → set support email → Save
 - [ ] Authentication → Settings → Authorized domains → add `<username>.github.io`
 - [ ] Build → Firestore Database → Create database → production mode → us-central1
