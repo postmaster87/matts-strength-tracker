@@ -836,12 +836,22 @@ function weekBlock(p,sess,w,highlight){
   h+=`</div>`;
   return h;
 }
+// Parse an "m/d" date into a sortable number (assumes one training cycle / same year)
+function mdKey(s){ const m=/^\s*(\d{1,2})\/(\d{1,2})\s*$/.exec(String(s)); return m?(+m[1])*100+(+m[2]):null; }
 function buildReport(){
   const refs=[];
   PROGRAM.forEach(p=>p.sessions.forEach(sess=>{
-    for(let w=0;w<sess.dates.length;w++){ if(weekHasData(p,sess,w)) refs.push({p,sess,w}); }
+    for(let w=0;w<sess.dates.length;w++){
+      if(weekHasData(p,sess,w)) refs.push({p,sess,w,k:mdKey(getDate(p.id,sess.id,w))});
+    }
   }));
-  refs.reverse(); // newest first
+  refs.reverse(); // reverse program order = fallback for undated / same-date ties
+  refs.sort((a,b)=>{           // stable sort: by the date entered, most recent first
+    if(a.k!=null && b.k!=null) return b.k-a.k;
+    if(a.k!=null) return -1;   // a dated session ranks above an undated one
+    if(b.k!=null) return 1;
+    return 0;                  // both undated -> keep reverse-program order
+  });
   let body=refs.map((r,i)=>weekBlock(r.p,r.sess,r.w,i===0)).join("");
 
   let gates="";
