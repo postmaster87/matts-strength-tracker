@@ -54,6 +54,9 @@ header{position:sticky; top:0; z-index:50; background:var(--navy);
 #syncBtn{padding:4px 12px; border-radius:999px; border:1px solid var(--gold); background:transparent;
   color:var(--gold); font-family:'Barlow Condensed'; font-weight:600; font-size:13px; letter-spacing:.06em; cursor:pointer;}
 #syncBtn.on{background:var(--gold); color:var(--navy-deep);}
+#exportBtn{padding:4px 12px; border-radius:999px; border:1px solid var(--teal); background:transparent;
+  color:var(--teal); font-family:'Barlow Condensed'; font-weight:600; font-size:13px; letter-spacing:.06em; cursor:pointer;}
+#exportBtn:active{background:var(--teal); color:#fff;}
 #saveState.saving{color:var(--gold);}
 #saveState.saved{color:#BFE8C6;}
 
@@ -164,6 +167,7 @@ textarea{resize:vertical; min-height:64px;}
     <div class="topline">
       <div class="brand">United Movement</div>
       <div style="display:flex; align-items:center; gap:10px;">
+        <button id="exportBtn" type="button">Export</button>
         <button id="syncBtn" type="button" style="display:none"></button>
         <div id="saveState">·</div>
       </div>
@@ -798,10 +802,127 @@ function applyRemote(remoteVals){
   }
 }
 
+/* ================= EXPORT — coach report =================
+   Turns the coordinate-keyed data into a clean, labeled report.
+   Most recent session first (highlighted) so a coach can glance at
+   "what Matt did this week" before a workout, with full history below. */
+function rEsc(s){ return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;"); }
+
+function weekHasData(p,sess,w){
+  if(val(`n.${p.id}.${sess.id}.${w}`)||val(`s.${p.id}.${sess.id}.${w}`)) return true;
+  return sess.groups.some((g,gi)=>g.ex.some((ex,ei)=>val(`e.${p.id}.${sess.id}.${gi}.${ei}.${w}`)));
+}
+function weekBlock(p,sess,w,highlight){
+  const off=sess.weekOffset||0;
+  let rows="";
+  sess.groups.forEach((g,gi)=>{
+    let gr="";
+    g.ex.forEach((ex,ei)=>{
+      const v=val(`e.${p.id}.${sess.id}.${gi}.${ei}.${w}`);
+      if(v){
+        const tgt=ex[1]?` <span class="tgt">${rEsc(ex[1])}</span>`:"";
+        gr+=`<tr><td class="ex">${rEsc(ex[0])}${tgt}</td><td class="v">${rEsc(v)}</td></tr>`;
+      }
+    });
+    if(gr) rows+=`<tr class="grp"><td colspan="2">${rEsc(g.g)}</td></tr>`+gr;
+  });
+  const nprs=val(`n.${p.id}.${sess.id}.${w}`), notes=val(`s.${p.id}.${sess.id}.${w}`);
+  const wl=p.weekLabels[w+off]||("W"+(w+1)), date=getDate(p.id,sess.id,w);
+  let h=`<div class="wk${highlight?" hl":""}">`;
+  h+=`<div class="wkH">${highlight?'<span class="badge">Most recent</span>':""}${rEsc(p.name)} · ${rEsc(wl)}${date?` · ${rEsc(date)}`:""}<div class="wkS">${rEsc(sess.name)}</div></div>`;
+  if(rows) h+=`<table>${rows}</table>`;
+  if(nprs) h+=`<div class="kv"><b>Right Hip NPRS (before → after):</b> ${rEsc(nprs)}</div>`;
+  if(notes) h+=`<div class="kv"><b>Session notes:</b> ${rEsc(notes)}</div>`;
+  h+=`</div>`;
+  return h;
+}
+function buildReport(){
+  const refs=[];
+  PROGRAM.forEach(p=>p.sessions.forEach(sess=>{
+    for(let w=0;w<sess.dates.length;w++){ if(weekHasData(p,sess,w)) refs.push({p,sess,w}); }
+  }));
+  refs.reverse(); // newest first
+  let body=refs.map((r,i)=>weekBlock(r.p,r.sess,r.w,i===0)).join("");
+
+  let gates="";
+  GATES.forEach(g=>{
+    let rows="";
+    g.crits.forEach((c,i)=>{ const v=val(`g.${g.id}.${i}`);
+      if(v) rows+=`<tr><td class="ex">${rEsc(c[0])} <span class="tgt">${rEsc(c[1])}</span></td><td class="v">${rEsc(v)}</td></tr>`; });
+    let meta="";
+    g.meta.forEach((m,i)=>{ const v=val(`gm.${g.id}.${i}`);
+      if(v) meta+=`<div class="kv"><b>${rEsc(m)}:</b> ${rEsc(v)}</div>`; });
+    if(rows||meta) gates+=`<div class="wk"><div class="wkH">${rEsc(g.title)}</div>${rows?`<table>${rows}</table>`:""}${meta}</div>`;
+  });
+  if(gates) gates=`<h2 class="sec">Gate Check-Ins &amp; RTG</h2>`+gates;
+
+  if(!body && !gates) body=`<p class="empty">No workouts logged yet — enter some data in the app first.</p>`;
+
+  const now=new Date();
+  const stamp=now.toLocaleDateString(undefined,{weekday:"short",year:"numeric",month:"long",day:"numeric"})+
+    " · "+now.toLocaleTimeString(undefined,{hour:"numeric",minute:"2-digit"});
+  return `<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Matt's Strength Tracker — Training Log</title>
+<style>
+*{box-sizing:border-box;}
+body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif;margin:0;color:#1A1A1A;background:#EEF0F4;}
+.sheet{max-width:800px;margin:0 auto;background:#fff;min-height:100vh;}
+.bar{position:sticky;top:0;z-index:5;background:#1F3864;padding:10px;text-align:center;}
+.bar button{background:#C9A84C;color:#16294A;border:none;padding:10px 22px;border-radius:999px;font-weight:700;font-size:15px;cursor:pointer;}
+.inner{padding:22px 20px 60px;}
+.hd{border-bottom:3px solid #1F3864;padding-bottom:14px;margin-bottom:6px;}
+.hd .k{font-size:11px;letter-spacing:.2em;text-transform:uppercase;color:#8A6D1F;font-weight:700;}
+.hd h1{margin:5px 0 3px;font-size:23px;color:#1F3864;line-height:1.15;}
+.hd .stamp{font-size:12px;color:#666;}
+h2.sec{font-size:13px;text-transform:uppercase;letter-spacing:.08em;color:#8A6D1F;margin:28px 0 4px;}
+.wk{margin:16px 0;border:1px solid #E2E6EC;border-radius:10px;overflow:hidden;}
+.wk .wkH{background:#D6E0F0;color:#16294A;font-weight:700;font-size:14px;padding:10px 12px;}
+.wk .wkS{font-weight:600;font-size:12px;color:#3A4A66;margin-top:2px;}
+.wk.hl{border:2px solid #2E9DAD;}
+.wk.hl .wkH{background:#2E9DAD;color:#fff;}
+.wk.hl .wkS{color:#DFF4F6;}
+.badge{display:inline-block;background:#fff;color:#1E6E7A;font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.08em;padding:2px 7px;border-radius:999px;margin-right:8px;vertical-align:middle;}
+table{width:100%;border-collapse:collapse;}
+td{padding:6px 12px;font-size:14px;border-bottom:1px solid #EFF1F4;vertical-align:top;}
+td.ex{color:#333;width:56%;}
+td.v{font-weight:700;color:#16294A;}
+.tgt{color:#9098A5;font-weight:400;font-size:12px;}
+tr.grp td{background:#F6F8F9;font-weight:700;font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:#8A6D1F;padding:7px 12px 5px;}
+.kv{font-size:13px;padding:7px 12px;color:#333;background:#FAFBFC;border-top:1px solid #EFF1F4;}
+.empty{color:#888;font-style:italic;padding:24px 0;}
+.foot{margin-top:26px;font-size:11px;color:#9098A5;border-top:1px solid #E2E6EC;padding-top:10px;}
+@media print{body{background:#fff;}.bar{display:none;}.sheet{max-width:none;}.wk{break-inside:avoid;}}
+</style></head><body>
+<div class="sheet">
+<div class="bar"><button onclick="window.print()">🖨 Print / Save as PDF</button></div>
+<div class="inner">
+<div class="hd"><div class="k">United Movement · The OV Standard</div>
+<h1>Matt's Strength Tracker — Training Log</h1>
+<div class="stamp">Generated ${stamp}</div></div>
+${body}
+${gates}
+<div class="foot">Values shown exactly as entered in the tracker. Most recent session is highlighted at the top.</div>
+</div></div>
+</body></html>`;
+}
+function exportReport(){
+  const html=buildReport();
+  const url=URL.createObjectURL(new Blob([html],{type:"text/html"}));
+  const w=window.open(url,"_blank");
+  if(!w){ // popup blocked -> download instead
+    const a=document.createElement("a");
+    a.href=url; a.download="matt-strength-log.html";
+    document.body.appendChild(a); a.click(); a.remove();
+  }
+  setTimeout(()=>URL.revokeObjectURL(url),60000);
+}
+
 /* ================= INIT ================= */
 (async function(){
   drawPad();
   initFirebase();
+  document.getElementById("exportBtn").onclick=exportReport;
   const found = await loadData();
   if(!found || !DATA || !DATA.pin){
     pinMode="create";
