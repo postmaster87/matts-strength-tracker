@@ -91,6 +91,11 @@ main{padding:6px 14px 30px;}
 .dateRow{display:flex; align-items:center; gap:10px; margin:8px 2px 14px;}
 .dateRow label{font-size:13px; color:var(--muted);}
 .dateRow input{width:110px;}
+.dateRow.need label{color:var(--danger); font-weight:600;}
+.dateRow.need input{border-color:var(--danger); box-shadow:0 0 0 2px rgba(179,64,47,.15);}
+.needNote{font-size:13px; color:var(--danger); background:#FBEDEA; border:1px solid #F0C9C1;
+  border-radius:10px; padding:10px 12px; margin:0 2px 14px; line-height:1.4;}
+input:disabled, textarea:disabled{background:var(--card-alt); color:var(--faint); cursor:not-allowed; opacity:.7;}
 
 .grp{font-family:'Barlow Condensed'; font-weight:700; font-size:14px; letter-spacing:.16em;
   text-transform:uppercase; margin:22px 0 8px; padding:7px 12px; border-radius:8px;}
@@ -498,6 +503,8 @@ function scheduleSave(){
 }
 function val(k){ return (DATA.vals && DATA.vals[k]) || ""; }
 function setVal(k,v){ DATA.vals[k]=v; scheduleSave(); }
+// Saving the date re-renders so entry fields enable/disable based on whether a date is set
+function setDate(k,v){ DATA.vals[k]=v; scheduleSave(); render(); }
 function getDate(p,s,w){ const k=`d.${p}.${s}.${w}`;
   if(DATA.vals[k]!==undefined) return DATA.vals[k];
   const ph=PROGRAM.find(x=>x.id===p); const se=ph.sessions.find(x=>x.id===s);
@@ -637,11 +644,14 @@ function render(){
   }
   weekBar.appendChild(wrap);
 
-  // session body
+  // session body — the session date is REQUIRED before any entry can be logged/saved
+  const dOK = !!getDate(ph.id,sess.id,cw).trim();
+  const disA = dOK ? "" : " disabled";
   let h=`<div class="sessTitle cond">${esc(sess.name)}</div>`;
-  h+=`<div class="dateRow"><label>${ph.weekLabels[cw+off]} date</label>
+  h+=`<div class="dateRow${dOK?"":" need"}"><label>${ph.weekLabels[cw+off]} date${dOK?"":" · required"}</label>
       <input type="text" inputmode="numeric" placeholder="mm/dd" value="${esc(getDate(ph.id,sess.id,cw))}"
-        oninput="fmtDate(this)" onchange="setVal('d.${ph.id}.${sess.id}.${cw}',this.value)"></div>`;
+        oninput="fmtDate(this)" onchange="setDate('d.${ph.id}.${sess.id}.${cw}',this.value)"></div>`;
+  if(!dOK) h+=`<div class="needNote">Enter the ${esc(ph.weekLabels[cw+off])} date above to start logging — the date the lift was performed is required so entries save, sync, and sort correctly.</div>`;
 
   sess.groups.forEach((g,gi)=>{
     h+=`<div class="grp ${grpClass(g.g)}">${esc(g.g)}</div>`;
@@ -658,7 +668,7 @@ function render(){
         <div class="nm">${esc(ex[0])}</div>
         <div class="meta">${ex[1]?`<span class="tag">${esc(ex[1])}</span>`:""}${ex[2]?`<span class="tag tempo">${esc(ex[2])}</span>`:""}</div>
         ${last?`<div class="last"><span class="lbl">LAST · ${ph.weekLabels[last.w+off]}</span><span class="val">${esc(last.v)}</span></div>`:""}
-        <input type="text" enterkeyhint="done" placeholder="weight × reps, band, notes…" value="${esc(val(k))}"
+        <input type="text" enterkeyhint="done"${disA} placeholder="weight × reps, band, notes…" value="${esc(val(k))}"
           onchange="setVal('${k}',this.value)">
         ${hist?`<button class="histToggle" onclick="this.nextElementSibling.classList.toggle('open');this.textContent=this.nextElementSibling.classList.contains('open')?'Hide all weeks':'All weeks'">All weeks</button><div class="hist">${hist}</div>`:""}
       </div>`;
@@ -667,10 +677,10 @@ function render(){
 
   h+=`<div class="footcards">
     <div class="card"><div class="nm">Right Hip NPRS (before → after)</div>
-      <input type="text" inputmode="decimal" placeholder="e.g. 2 → 1" value="${esc(val(`n.${ph.id}.${sess.id}.${cw}`))}"
+      <input type="text" inputmode="decimal"${disA} placeholder="e.g. 2 → 1" value="${esc(val(`n.${ph.id}.${sess.id}.${cw}`))}"
         onchange="setVal('n.${ph.id}.${sess.id}.${cw}',this.value)"></div>
     <div class="card"><div class="nm">Session notes</div>
-      <textarea placeholder="How did it go?" onchange="setVal('s.${ph.id}.${sess.id}.${cw}',this.value)">${esc(val(`s.${ph.id}.${sess.id}.${cw}`))}</textarea></div>
+      <textarea placeholder="How did it go?"${disA} onchange="setVal('s.${ph.id}.${sess.id}.${cw}',this.value)">${esc(val(`s.${ph.id}.${sess.id}.${cw}`))}</textarea></div>
   </div>
   <div class="note">The OV Standard LLC · United Movement · autosaves as you type</div>`;
   main.innerHTML=h;
@@ -842,7 +852,9 @@ function buildReport(){
   const refs=[];
   PROGRAM.forEach(p=>p.sessions.forEach(sess=>{
     for(let w=0;w<sess.dates.length;w++){
-      if(weekHasData(p,sess,w)) refs.push({p,sess,w,k:mdKey(getDate(p.id,sess.id,w))});
+      const dt=getDate(p.id,sess.id,w);
+      // Only include a session if it has data AND a date. Undated sessions are dropped.
+      if(weekHasData(p,sess,w) && dt && dt.trim()) refs.push({p,sess,w,k:mdKey(dt)});
     }
   }));
   refs.reverse(); // reverse program order = fallback for undated / same-date ties
