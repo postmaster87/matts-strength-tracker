@@ -95,6 +95,11 @@ main{padding:6px 14px 30px;}
 .dateRow.need input{border-color:var(--danger); box-shadow:0 0 0 2px rgba(179,64,47,.15);}
 .needNote{font-size:13px; color:var(--danger); background:#FBEDEA; border:1px solid #F0C9C1;
   border-radius:10px; padding:10px 12px; margin:0 2px 14px; line-height:1.4;}
+.warnNote{font-size:13px; color:var(--gold-ink); background:var(--gold-tint); border:1px solid #E7D4A0;
+  border-radius:10px; padding:10px 12px; margin:0 2px 14px; line-height:1.4;}
+.card.needCard{border:1.5px solid var(--danger); box-shadow:0 0 0 2px rgba(179,64,47,.12);}
+.reqTag{display:inline-block; font-size:11px; font-weight:700; color:#fff; background:var(--danger);
+  border-radius:999px; padding:2px 8px; margin-left:8px; vertical-align:middle; text-transform:uppercase; letter-spacing:.04em;}
 input:disabled, textarea:disabled{background:var(--card-alt); color:var(--faint); cursor:not-allowed; opacity:.7;}
 
 .grp{font-family:'Barlow Condensed'; font-weight:700; font-size:14px; letter-spacing:.16em;
@@ -496,15 +501,20 @@ function scheduleSave(){
   saveTimer=setTimeout(async ()=>{
     try{ await store.set(STORE_KEY, JSON.stringify(DATA));
       pushCloud();
-      el.textContent=CLOUD?"Saved":(fbUser?"Saved + synced":"Saved (this device)"); el.className="saved";
+      let msg;
+      if(CLOUD) msg="Saved";
+      else if(fbUser && sessionNeedsNPRS()) msg="Saved on device · Hip NPRS needed to sync";
+      else if(fbUser) msg="Saved + synced";
+      else msg="Saved (this device)";
+      el.textContent=msg; el.className="saved";
       setTimeout(()=>{el.textContent="·";el.className="";},1500);
     }catch(e){ el.textContent="Save failed — check connection"; el.className="saving"; }
   },700);
 }
 function val(k){ return (DATA.vals && DATA.vals[k]) || ""; }
 function setVal(k,v){ DATA.vals[k]=v; scheduleSave(); }
-// Saving the date re-renders so entry fields enable/disable based on whether a date is set
-function setDate(k,v){ DATA.vals[k]=v; scheduleSave(); render(); }
+// Saving a required field (date / Hip NPRS) re-renders so gating + sync state update immediately
+function setReq(k,v){ DATA.vals[k]=v; scheduleSave(); render(); }
 function getDate(p,s,w){ const k=`d.${p}.${s}.${w}`;
   if(DATA.vals[k]!==undefined) return DATA.vals[k];
   const ph=PROGRAM.find(x=>x.id===p); const se=ph.sessions.find(x=>x.id===s);
@@ -650,8 +660,13 @@ function render(){
   let h=`<div class="sessTitle cond">${esc(sess.name)}</div>`;
   h+=`<div class="dateRow${dOK?"":" need"}"><label>${ph.weekLabels[cw+off]} date${dOK?"":" · required"}</label>
       <input type="text" inputmode="numeric" placeholder="mm/dd" value="${esc(getDate(ph.id,sess.id,cw))}"
-        oninput="fmtDate(this)" onchange="setDate('d.${ph.id}.${sess.id}.${cw}',this.value)"></div>`;
+        oninput="fmtDate(this)" onchange="setReq('d.${ph.id}.${sess.id}.${cw}',this.value)"></div>`;
   if(!dOK) h+=`<div class="needNote">Enter the ${esc(ph.weekLabels[cw+off])} date above to start logging — the date the lift was performed is required so entries save, sync, and sort correctly.</div>`;
+  // Hip NPRS gates cloud sync (not logging): a logged session stays on-device until the post-lift score is recorded
+  const nKey=`n.${ph.id}.${sess.id}.${cw}`;
+  const hasEx=sess.groups.some((g,gi)=>g.ex.some((ex,ei)=>val(`e.${ph.id}.${sess.id}.${gi}.${ei}.${cw}`)));
+  const needN = dOK && hasEx && !val(nKey).trim();
+  if(needN) h+=`<div class="warnNote">Record your <b>Right Hip NPRS</b> below (how the hip felt after the lift) to ${fbUser?"sync this session to your coach":"finish this session"} — your logged lifts stay on this device until you do.</div>`;
 
   sess.groups.forEach((g,gi)=>{
     h+=`<div class="grp ${grpClass(g.g)}">${esc(g.g)}</div>`;
@@ -676,9 +691,9 @@ function render(){
   });
 
   h+=`<div class="footcards">
-    <div class="card"><div class="nm">Right Hip NPRS (before → after)</div>
-      <input type="text" inputmode="decimal"${disA} placeholder="e.g. 2 → 1" value="${esc(val(`n.${ph.id}.${sess.id}.${cw}`))}"
-        onchange="setVal('n.${ph.id}.${sess.id}.${cw}',this.value)"></div>
+    <div class="card${needN?" needCard":""}"><div class="nm">Right Hip NPRS (before → after)${needN?' <span class="reqTag">required to sync</span>':""}</div>
+      <input type="text" inputmode="decimal"${disA} placeholder="e.g. 2 → 1" value="${esc(val(nKey))}"
+        onchange="setReq('${nKey}',this.value)"></div>
     <div class="card"><div class="nm">Session notes</div>
       <textarea placeholder="How did it go?"${disA} onchange="setVal('s.${ph.id}.${sess.id}.${cw}',this.value)">${esc(val(`s.${ph.id}.${sess.id}.${cw}`))}</textarea></div>
   </div>
@@ -793,8 +808,19 @@ function initFirebase(){
   };
   syncUI();
 }
+// True when the session in view has logged lifts but no Right Hip NPRS yet -> hold cloud sync
+function sessionNeedsNPRS(){
+  if(!DATA || ui.tab!=="program") return false;
+  const ph=PROGRAM[ui.phase]; if(!ph) return false;
+  const sess=ph.sessions[ui.sess]; if(!sess) return false;
+  const w=ui.week[ph.id+"."+sess.id]; const cw=(w===undefined?0:w);
+  const hasEx=sess.groups.some((g,gi)=>g.ex.some((ex,ei)=>val(`e.${ph.id}.${sess.id}.${gi}.${ei}.${cw}`)));
+  if(!hasEx) return false;
+  return !val(`n.${ph.id}.${sess.id}.${cw}`).trim();
+}
 function pushCloud(){
   if(!fbUser || !fbDoc || !DATA) return;
+  if(sessionNeedsNPRS()) return; // hold sync until the post-lift Hip NPRS is recorded
   fbDoc.set({vals: DATA.vals, updated: Date.now(), by: fbUser.email||""}, {merge:true})
     .catch(e=>console.warn("sync write blocked:", e.message));
 }
